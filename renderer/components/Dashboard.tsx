@@ -11,6 +11,7 @@ import clsx from 'clsx';
 import { SystemProcess, NetworkConnection } from '../../shared/types';
 import { LineChart, Line, ResponsiveContainer, YAxis, AreaChart, Area } from 'recharts';
 import { ArcSlider } from './ArcSlider';
+import { ProcessRadar } from './ProcessRadar';
 
 type SortMode = 'cpu' | 'mem' | 'net';
 
@@ -284,6 +285,15 @@ export function Dashboard() {
                      </div>
                  </div>
              </div>
+          </div>
+
+          {/* Process Radar Visualization */}
+          <div className="px-4 pb-3">
+             <ProcessRadar 
+               processes={processedList}
+               selectedPid={selectedPid}
+               onSelect={setSelectedPid}
+             />
           </div>
 
           {/* Filters & Column Headers */}

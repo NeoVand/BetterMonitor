@@ -32,7 +32,7 @@ An AI-powered activity monitor for macOS that transforms cryptic system processe
 ## Requirements
 
 - **macOS** 14+ (Sonoma or later recommended)
-- **Node.js** 18+
+- **Node.js** 18+ 
 - **npm** 9+
 - **Make** (comes with Xcode Command Line Tools)
 
