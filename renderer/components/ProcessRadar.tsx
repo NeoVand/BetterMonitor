@@ -2,33 +2,13 @@
 
 import { useMemo } from 'react';
 import { SystemProcess } from '../../shared/types';
+import { stringToColor, filterActiveProcesses, sortProcesses } from '@/lib/process-utils';
+import { useProcessStore } from '@/lib/store';
 
 interface ProcessRadarProps {
   processes: SystemProcess[];
   selectedPid: number | null;
   onSelect: (pid: number | null) => void;
-}
-
-// Generate a consistent HSL color from a string (process name)
-// Uses a simple but effective hash that produces well-distributed hues
-function stringToColor(str: string): string {
-  // FNV-1a hash - fast and good distribution
-  let hash = 2166136261;
-  for (let i = 0; i < str.length; i++) {
-    hash ^= str.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  
-  // Convert hash to color components
-  // Hue: full 360 degree range
-  const hue = Math.abs(hash) % 360;
-  
-  // Use different parts of hash for saturation and lightness variation
-  // Keep saturation high (60-90%) and lightness in visible range (45-65%)
-  const saturation = 60 + (Math.abs(hash >> 8) % 30);
-  const lightness = 45 + (Math.abs(hash >> 16) % 20);
-  
-  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
 
 // Axes arranged for better visual clustering
@@ -119,11 +99,13 @@ export function ProcessRadar({ processes, selectedPid, onSelect }: ProcessRadarP
   const center = size / 2;
   const maxRadius = size / 2 - 35;
   
+  // Get sort mode from store - single source of truth
+  const sortMode = useProcessStore(state => state.sortMode);
+  
   // Calculate normalized values for each process
-  const { topProcesses, ghostProcesses } = useMemo(() => {
-    const activeProcesses = processes.filter(p => 
-      p.cpu > 0.1 || p.mem > 5 || (p.netIn || 0) > 0 || (p.netOut || 0) > 0
-    );
+  const { topProcesses, ghostProcesses, selectedProcess } = useMemo(() => {
+    // Use shared filter and sort functions - single source of truth
+    const activeProcesses = sortProcesses(filterActiveProcesses(processes), sortMode);
     
     const maxVals = {
       cpu: Math.max(1, ...activeProcesses.map(p => p.cpu)),
@@ -151,16 +133,35 @@ export function ProcessRadar({ processes, selectedPid, onSelect }: ProcessRadarP
       rank: idx,
     }));
     
-    // Rest become ghosts
-    const ghosts = activeProcesses.slice(10, 50).map((p, idx) => ({
-      process: p,
-      values: normalize(p),
-      rank: idx + 10,
-      opacity: Math.max(0.03, 0.15 - idx * 0.003),
-    }));
+    // Check if selected process is already in top 10
+    const selectedInTop = selectedPid ? top.some(t => t.process.pid === selectedPid) : false;
     
-    return { topProcesses: top, ghostProcesses: ghosts };
-  }, [processes]);
+    // If selected process is not in top 10, find it and add it specially
+    let selected: { process: SystemProcess; color: string; values: ReturnType<typeof normalize>; rank: number } | null = null;
+    if (selectedPid && !selectedInTop) {
+      const selectedProc = processes.find(p => p.pid === selectedPid);
+      if (selectedProc) {
+        selected = {
+          process: selectedProc,
+          color: stringToColor(selectedProc.name),
+          values: normalize(selectedProc),
+          rank: -1, // Special rank for selected
+        };
+      }
+    }
+    
+    // Rest become ghosts (exclude selected if it's being shown specially)
+    const ghosts = activeProcesses.slice(10, 50)
+      .filter(p => p.pid !== selectedPid) // Don't show selected as ghost
+      .map((p, idx) => ({
+        process: p,
+        values: normalize(p),
+        rank: idx + 10,
+        opacity: Math.max(0.03, 0.15 - idx * 0.003),
+      }));
+    
+    return { topProcesses: top, ghostProcesses: ghosts, selectedProcess: selected };
+  }, [processes, selectedPid, sortMode]);
   
   // Generate axis lines and labels
   const axisElements = AXES.map((axis) => {
@@ -244,14 +245,19 @@ export function ProcessRadar({ processes, selectedPid, onSelect }: ProcessRadarP
     );
   });
   
-  // Top process shapes with consistent colors
-  const processShapes = topProcesses.map(({ process, color, values, rank }) => {
+  // Helper to render a process shape
+  const renderProcessShape = (
+    process: SystemProcess, 
+    color: string, 
+    values: Record<string, number>, 
+    rank: number,
+    isSelected: boolean
+  ) => {
     const points = getProcessPoints(values);
     const pathD = createSmoothClosedPath(points, 10);
-    const isSelected = process.pid === selectedPid;
     
-    const strokeWidth = isSelected ? 2.5 : Math.max(0.8, 1.8 - rank * 0.1);
-    const fillOpacity = isSelected ? 0.2 : Math.max(0.02, 0.08 - rank * 0.006);
+    const strokeWidth = isSelected ? 2.5 : Math.max(0.8, 1.8 - Math.max(0, rank) * 0.1);
+    const fillOpacity = isSelected ? 0.2 : Math.max(0.02, 0.08 - Math.max(0, rank) * 0.006);
     
     return (
       <g 
@@ -287,7 +293,23 @@ export function ProcessRadar({ processes, selectedPid, onSelect }: ProcessRadarP
         />
       </g>
     );
-  });
+  };
+  
+  // Top process shapes with consistent colors
+  const processShapes = topProcesses.map(({ process, color, values, rank }) => 
+    renderProcessShape(process, color, values, rank, process.pid === selectedPid)
+  );
+  
+  // Add selected process shape if it's not in top 10
+  const selectedShape = selectedProcess 
+    ? renderProcessShape(
+        selectedProcess.process, 
+        selectedProcess.color, 
+        selectedProcess.values, 
+        selectedProcess.rank, 
+        true
+      )
+    : null;
   
   const totalActive = topProcesses.length + ghostProcesses.length;
   
@@ -336,6 +358,7 @@ export function ProcessRadar({ processes, selectedPid, onSelect }: ProcessRadarP
           {axisElements}
           {ghostShapes}
           {[...processShapes].reverse()}
+          {selectedShape}
           
           <circle
             cx={center}

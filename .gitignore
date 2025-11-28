@@ -27,6 +27,11 @@ renderer/.next/
 .env.local
 .env.*.local
 
+# API keys (NEVER commit these!)
+**/apikey.txt
+**/apikey*.txt
+*.key
+
 # IDE / Editor
 .idea/
 .vscode/

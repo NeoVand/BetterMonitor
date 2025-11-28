@@ -1,13 +1,24 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
 import { getSystemProcesses } from './monitor';
-import { initDatabase, saveSetting, getSetting, recordSnapshots } from './database';
+import { 
+  initDatabase, saveSetting, getSetting, recordSnapshots,
+  getChatHistory, addChatMessage, clearChatHistory 
+} from './database';
 import { analyzeProcess } from './ai';
 import { getProcessNetworkStats, getProcessConnections } from './detailed-stats';
+import { 
+  getAISettings, saveAISettings, testConnection, 
+  CHAT_MODELS, EMBEDDING_MODELS 
+} from './openrouter';
+import type { AISettings } from './openrouter';
+import { fullRecluster, getCurrentClusters, refreshClusterStats, needsFullRecluster } from './clustering';
+import { processChat, streamChat, getChatSuggestions } from './chat-agent';
 
 const isDev = process.env.NODE_ENV === 'development';
 
 let mainWindow: BrowserWindow | null = null;
+
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -95,6 +106,94 @@ app.on('ready', () => {
 
   ipcMain.handle('monitor:get-process-connections', async (_, pid) => {
     return await getProcessConnections(pid);
+  });
+
+  // ============ AI Settings Handlers ============
+  
+  ipcMain.handle('ai:get-settings', () => {
+    return getAISettings();
+  });
+
+  ipcMain.handle('ai:save-settings', (_, settings: Partial<AISettings>) => {
+    saveAISettings(settings);
+    return true;
+  });
+
+  ipcMain.handle('ai:test-connection', async (_, apiKey: string) => {
+    return await testConnection(apiKey);
+  });
+
+  ipcMain.handle('ai:get-models', () => {
+    return {
+      chatModels: CHAT_MODELS,
+      embeddingModels: EMBEDDING_MODELS,
+    };
+  });
+
+  // ============ Chat Handlers ============
+
+  ipcMain.handle('chat:send', async (event, message: string) => {
+    try {
+      // Add user message to history
+      addChatMessage('user', message);
+      
+      // Stream the response
+      let fullResponse = '';
+      
+      for await (const chunk of streamChat(message)) {
+        fullResponse += chunk;
+        // Send chunk to renderer for live updates
+        event.sender.send('chat:stream', chunk);
+      }
+      
+      // Add complete assistant response to history
+      addChatMessage('assistant', fullResponse);
+      
+      return { success: true, response: fullResponse };
+    } catch (error) {
+      console.error('Chat error:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('chat:suggestions', () => {
+    return getChatSuggestions();
+  });
+
+  ipcMain.handle('chat:get-history', () => {
+    return getChatHistory(50);
+  });
+
+  ipcMain.handle('chat:clear', () => {
+    clearChatHistory();
+    return true;
+  });
+
+  // ============ Clustering Handlers ============
+
+  ipcMain.handle('ai:cluster-processes', async () => {
+    try {
+      const data = await getSystemProcesses();
+      const tree = await fullRecluster(data.processes);
+      return { success: true, tree };
+    } catch (error) {
+      console.error('Clustering error:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  ipcMain.handle('ai:get-clusters', () => {
+    return getCurrentClusters();
+  });
+
+  ipcMain.handle('ai:refresh-cluster-stats', async () => {
+    try {
+      const data = await getSystemProcesses();
+      refreshClusterStats(data.processes);
+      return { success: true, clusters: getCurrentClusters() };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
   });
 });
 

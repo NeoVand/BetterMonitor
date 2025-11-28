@@ -42,8 +42,6 @@ export function ArcSlider({ value, onChange, min, max }: ArcSliderProps) {
     };
   };
   
-  const startPoint = angleToPoint(startAngle);
-  const endPoint = angleToPoint(endAngle);
   const currentPoint = angleToPoint(currentAngle);
   
   // Create arc path using SVG arc command
@@ -78,7 +76,7 @@ export function ArcSlider({ value, onChange, min, max }: ArcSliderProps) {
     const newNormalized = (angle - startAngle) / angleRange;
     const newValue = Math.round(min + newNormalized * (max - min));
     onChange(Math.max(min, Math.min(max, newValue)));
-  }, [onChange, min, max]);
+  }, [onChange, min, max, angleRange, cx, startAngle]);
   
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
