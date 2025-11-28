@@ -1,0 +1,91 @@
+{
+  "name": "bettermonitor",
+  "version": "1.0.0",
+  "description": "An AI-powered activity monitor for macOS that makes system processes understandable",
+  "main": "dist/electron/electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:next\" \"npm run dev:electron\"",
+    "dev:next": "next dev renderer -p 3000",
+    "dev:electron": "wait-on http://localhost:3000 && tsc -p electron && cross-env NODE_ENV=development electron .",
+    "build": "npm run build:next && npm run build:electron",
+    "build:next": "next build renderer",
+    "build:electron": "tsc -p electron",
+    "start": "cross-env NODE_ENV=production electron .",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "postinstall": "electron-builder install-app-deps",
+    "lint": "eslint renderer"
+  },
+  "build": {
+    "appId": "com.bettermonitor.app",
+    "productName": "Better Monitor",
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": ["dmg", "zip"],
+      "icon": "assets/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "files": [
+      "dist/**/*",
+      "renderer/dist/out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "renderer/dist/out",
+        "to": "renderer/dist/out"
+      }
+    ],
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "asar": true
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
+    "@tailwindcss/postcss": "^4.1.17",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.0",
+    "autoprefixer": "^10.4.22",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^39.2.4",
+    "electron-builder": "^26.0.12",
+    "eslint-config-next": "^16.0.5",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.17",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "wait-on": "^9.0.3"
+  },
+  "dependencies": {
+    "@langchain/openai": "^1.1.3",
+    "active-win": "^8.2.1",
+    "better-sqlite3": "^12.4.6",
+    "clsx": "^2.1.1",
+    "dotenv": "^17.2.3",
+    "framer-motion": "^12.23.24",
+    "langchain": "^1.1.1",
+    "lucide-react": "^0.555.0",
+    "next": "^16.0.5",
+    "openai": "^6.9.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "recharts": "^3.5.0",
+    "systeminformation": "^5.27.11",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.1.13",
+    "zustand": "^5.0.8"
+  }
+}
