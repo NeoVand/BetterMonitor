@@ -27,9 +27,10 @@ declare global {
       
       // Chat
       sendChatMessage: (message: string) => Promise<{ success: boolean; response?: string; error?: string }>;
+      sendChatMessageStreaming: (message: string) => Promise<{ success: boolean; response?: string; error?: string }>;
       getChatHistory: () => Promise<ChatMessage[]>;
       clearChatHistory: () => Promise<boolean>;
-      onChatStream?: (callback: (chunk: string) => void) => () => void;
+      onChatStream: (callback: (chunk: string) => void) => () => void;
       
       // Clustering
       clusterProcesses: () => Promise<{ success: boolean; tree?: ClusterTree; error?: string }>;

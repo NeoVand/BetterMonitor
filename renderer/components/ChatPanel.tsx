@@ -116,8 +116,8 @@ export function ChatPanel() {
   useEffect(() => {
     if (typeof window === 'undefined' || !window.electron) return;
     
-    const cleanup = window.electron.onChatStream?.(handleStreamChunk);
-    return () => cleanup?.();
+    const cleanup = window.electron.onChatStream(handleStreamChunk);
+    return () => cleanup();
   }, [handleStreamChunk]);
 
   const handleSend = async () => {
@@ -133,7 +133,8 @@ export function ChatPanel() {
     setChatLoading(true);
 
     try {
-      const result = await window.electron.sendChatMessage(userMessage);
+      // Use streaming method
+      const result = await window.electron.sendChatMessageStreaming(userMessage);
       
       // Clear streaming content and add final message
       setStreamingContent('');

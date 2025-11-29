@@ -27,10 +27,26 @@ contextBridge.exposeInMainWorld('electron', {
   
   // Chat with streaming support
   sendChatMessage: (message: string) => ipcRenderer.invoke('chat:send', message) as Promise<{ success: boolean; response?: string; error?: string }>,
+  
+  // Streaming chat - returns a promise that resolves when complete
+  sendChatMessageStreaming: (message: string) => {
+    return new Promise<{ success: boolean; response?: string; error?: string }>((resolve) => {
+      // Set up one-time listener for completion
+      const endHandler = (_event: Electron.IpcRendererEvent, result: { success: boolean; response?: string; error?: string }) => {
+        ipcRenderer.removeListener('chat:stream-end', endHandler);
+        resolve(result);
+      };
+      ipcRenderer.on('chat:stream-end', endHandler);
+      
+      // Send the message (this triggers streaming)
+      ipcRenderer.send('chat:send-stream', message);
+    });
+  },
+  
   getChatHistory: () => ipcRenderer.invoke('chat:get-history') as Promise<ChatMessage[]>,
   clearChatHistory: () => ipcRenderer.invoke('chat:clear'),
   
-  // Streaming listener
+  // Streaming listeners
   onChatStream: (callback: (chunk: string) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, chunk: string) => callback(chunk);
     ipcRenderer.on('chat:stream', handler);

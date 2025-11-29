@@ -132,7 +132,8 @@ app.on('ready', () => {
 
   // ============ Chat Handlers ============
 
-  ipcMain.handle('chat:send', async (event, message: string) => {
+  // Use ipcMain.on for streaming (not handle) so we can send multiple messages
+  ipcMain.on('chat:send-stream', async (event, message: string) => {
     try {
       // Add user message to history
       addChatMessage('user', message);
@@ -149,7 +150,27 @@ app.on('ready', () => {
       // Add complete assistant response to history
       addChatMessage('assistant', fullResponse);
       
-      return { success: true, response: fullResponse };
+      // Signal completion
+      event.sender.send('chat:stream-end', { success: true, response: fullResponse });
+    } catch (error) {
+      console.error('Chat error:', error);
+      event.sender.send('chat:stream-end', { success: false, error: String(error) });
+    }
+  });
+
+  // Keep the handle version for non-streaming fallback
+  ipcMain.handle('chat:send', async (_, message: string) => {
+    try {
+      // Add user message to history
+      addChatMessage('user', message);
+      
+      // Get response (non-streaming)
+      const response = await processChat(message);
+      
+      // Add assistant response to history
+      addChatMessage('assistant', response);
+      
+      return { success: true, response };
     } catch (error) {
       console.error('Chat error:', error);
       return { success: false, error: String(error) };
